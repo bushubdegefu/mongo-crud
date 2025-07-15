@@ -2,52 +2,7 @@ package models
 
 import (
 	"time"
-	
-	{{- $break_3 := false }}
-	{{- range .Fields }}
-		{{- if eq .Name "UUID" }}
-			{{- $break_3 = true }}
-		{{- end }}
-	{{- end }}
-
-	{{- if $break_3 }}
-	"github.com/google/uuid"
-	{{- end }}
-
-	{{- $break_9 := false }}
-	{{- range .Fields }}
-		{{- if eq .Name "json.RawMessage" }}
-			{{- $break_9 = true }}
-		{{- end }}
-	{{- end }}
-
-	{{- if $break_9 }}
-	"encoding/json"
-	{{- end }}
-
-
-	{{ if and (not (eq .AuthAppName .AppName)) (eq .AuthAppType "standalone") }}
-	{{ .AuthAppName | replaceString }}_models "{{ .ProjectName }}/{{ .AuthAppName }}/models"
-	{{- end }}
-
-	{{- $break_7 := false }}
-	{{- range .Fields }}
-	{{- if eq .Type "sql.NullInt64" }}
-	{{- $break_7 = true }}
-	{{- end }}
-	{{- end }}
-
-	{{- if or (eq $break_7 true) (eq .AuthAppType "standalone") }}
-	"database/sql"
-	{{- end }}
-
-	{{- if eq .AuthAppType "standalone" }}
-	"fmt"
-	"log"
-	{{- end }}
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-
 
 )
 
@@ -57,8 +12,8 @@ type {{.Name}} struct {
     {{range .Fields}} {{.Name}} {{.Type}}  {{.BackTick}}{{.Annotation}}{{.BackTick}}
 	{{end}}
 	// The following fields will be ignored by Swagger
-   	CreatedAt time.Time {{.BackTick}}json:"created_at,omitempty"{{.BackTick}}
-    UpdatedAt time.Time {{.BackTick}}json:"updated_at,omitempty"{{.BackTick}}
+   	CreatedAt time.Time {{.BackTick}}bson:"created_at,omitempty"{{.BackTick}}
+    UpdatedAt time.Time {{.BackTick}}bson:"updated_at,omitempty"{{.BackTick}}
 }
 
 {{- $hasUUID := false }}
@@ -75,66 +30,6 @@ type {{.Name}} struct {
     {{- end }}
 {{- end }}
 
-{{- if not $hasUUID }}
-func (entity *{{.Name}}) BeforeCreate(tx *gorm.DB) (err error) {
-   	{{- if $hasPassword }}
-  		entity.Password = HashFunc(entity.Password)
-   	{{- end }}
-    entity.CreatedAt = time.Now()
-    return
-}
-{{- end }}
-
-{{- $break_4 := false }}
-{{- range .Fields}}
-{{- if eq .Name "UUID" }}
-func (entity *{{.NormalModelName}}) BeforeCreate(tx *gorm.DB) (err error) {
-	gen, _ := uuid.NewV7()
-	entity.CreatedAt = time.Now();
-	id := gen.String()
-	entity.UUID = id
-	{{- if $hasPassword }}
-  		entity.Password = HashFunc(entity.Password)
-   	{{- end }}
-	return
-}
-{{- $break_4 = true }}
-{{- end}}
-{{- end}}
-
-func (entity *{{.Name}}) BeforeUpdate(tx *gorm.DB) (err error) {
-	entity.UpdatedAt = time.Now();
-	return
-}
-
-{{- if eq .AuthAppType "standalone" }}
-func (entity *{{.Name}}) Populate(tx *gorm.DB) {
-	// Create ContentType for User model
-	contentType := {{ if not (eq .AuthAppName .AppName) }}{{ .AuthAppName | replaceString }}_models.{{- end}}ContentType{
-		AppLabel: "{{ .AppName | replaceString }}",
-		Model:    "{{.LowerName}}",
-	}
-	if err := tx.Create(&contentType).Error; err != nil {
-		log.Fatalf("Failed to create ContentType: %v", err)
-	}
-
-	// Create Permissions for User model
-	permissions := []{{ if not (eq .AuthAppName .AppName) }}{{ .AuthAppName | replaceString }}_models.{{- end}}Permission{
-		{ContentTypeID: sql.NullInt64{Int64: int64(contentType.ID), Valid: true}, Codename: "{{ .AppName | replaceString }}_can_add_{{.LowerName}}"},
-		{ContentTypeID: sql.NullInt64{Int64: int64(contentType.ID), Valid: true}, Codename: "{{ .AppName | replaceString }}_can_view_{{.LowerName}}"},
-		{ContentTypeID: sql.NullInt64{Int64: int64(contentType.ID), Valid: true}, Codename: "{{ .AppName | replaceString }}_can_change_{{.LowerName}}"},
-		{ContentTypeID: sql.NullInt64{Int64: int64(contentType.ID), Valid: true}, Codename: "{{ .AppName | replaceString }}_can_delete_{{.LowerName}}"},
-	}
-
-	for _, permission := range permissions {
-		if err := tx.Create(&permission).Error; err != nil {
-			log.Fatalf("Failed to create Permission: %v", err)
-		}
-	}
-
-	fmt.Println("Populated ContentType and Permissions for {{.Name}} request actions successfully")
-}
-{{- end }}
 
 // {{.Name}}Post model info
 // @Description {{.Name}}Post type information
@@ -147,8 +42,8 @@ type {{.Name}}Post struct {
 type {{.Name}}Get struct {
 	{{range .Fields}} {{- if .Get}}	{{.Name}} {{.Type}}  {{.BackTick}}{{.Annotation}}{{.BackTick}} {{- end}}
 	{{end}}
-	CreatedAt time.Time {{.BackTick}}json:"created_at,omitempty"{{.BackTick}}
-	UpdatedAt time.Time {{.BackTick}}json:"updated_at,omitempty"{{.BackTick}}
+	CreatedAt time.Time {{.BackTick}}bson:"created_at,omitempty"{{.BackTick}}
+	UpdatedAt time.Time {{.BackTick}}bson:"updated_at,omitempty"{{.BackTick}}
 }
 
 // {{.Name}}Put model info

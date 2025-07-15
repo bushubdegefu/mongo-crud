@@ -11,6 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 // UserService wraps MongoDB logic for users
@@ -30,12 +31,116 @@ func New{{.Name}}Service() (*{{.Name}}Service, error) {
 }
 
 // Create inserts a new {{.LowerName}}
-func (s *{{.Name}}Service) Create(ctx context.Context, {{.LowerName}} *models.{{.Name}}) (*models.{{.Name}}, error) {
+func (s *{{.Name}}Service) Create(ctx context.Context, posted_{{.LowerName}} *models.{{.Name}}Post) (*models.{{.Name}}, error) {
 	//  initalizing colleciton
 	New{{.Name}}Service()
-	{{.LowerName}}.ID = primitive.NewObjectID()
-	{{.LowerName}}.CreatedAt = time.Now()
-
+	{{.LowerName}} := models.{{.Name}}{
+    	{{- range .Fields}} {{- if .Post}}
+    	    {{.Name}}:  posted_{{.ModelName | toLowerCaseName }}.{{.Name}},
+    	{{- end}}
+    	{{- end}}
+        }
 	_, err := s.Collection.InsertOne(ctx, {{.LowerName}})
-	return {{.LowerName}}, err
+	return &{{.LowerName}}, err
+}
+
+// GetOne fetches a {{.LowerName}} by ID
+func (s *{{.Name}}Service) GetOne(ctx context.Context, id string) (*models.{{.Name}}, error) {
+	//  initalizing colleciton
+	New{{.Name}}Service()
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid ID: %w", err)
+	}
+
+	var {{.LowerName}} models.{{.Name}}
+	err = s.Collection.FindOne(ctx, bson.M{"_id": objID}).Decode(&{{.LowerName}})
+	if err != nil {
+		return nil, err
+	}
+
+	return &{{.LowerName}}, nil
+}
+
+// Get returns {{.LowerName}}s with pagination and search
+func (s *{{.Name}}Service) Get(ctx context.Context, pagination models.Pagination, searchFields []string, searchTerm string) ([]models.{{.Name}}, error) {
+	//  initalizing colleciton
+	New{{.Name}}Service()
+
+	// Build search query
+	filter := bson.M{}
+	if searchTerm != "" && len(searchFields) > 0 {
+		var orConditions []bson.M
+		for _, field := range searchFields {
+			orConditions = append(orConditions, bson.M{field: bson.M{"$regex": searchTerm, "$options": "i"}})
+		}
+		filter["$or"] = orConditions
+	}
+
+	opts := options.Find().
+		SetSkip(int64(pagination.Offset + pagination.Page*pagination.Size)).
+		SetLimit(int64(pagination.Size))
+
+	cursor, err := s.Collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var {{.LowerName}}s []models.{{.Name}}
+	for cursor.Next(ctx) {
+		var u models.{{.Name}}
+		if err := cursor.Decode(&u); err != nil {
+			return nil, err
+		}
+		{{.LowerName}}s = append({{.LowerName}}s, u)
+	}
+
+	return {{.LowerName}}s, nil
+}
+
+// Update modifies a {{.Name}}s by ID
+func (s *{{.Name}}Service) Update(ctx context.Context, {{.LowerName}} *models.{{.Name}}Patch) (*models.{{.Name}}, error) {
+	//  initalizing colleciton
+	New{{.Name}}Service()
+
+	if {{.LowerName}}.ID.IsZero() {
+		return nil, errors.New("{{.LowerName}} ID is missing")
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+		{{- range .Fields}} {{- if .Patch}}
+		    "{{.Name | camelToSnake }}": {{.ModelName | toLowerCaseName }}.{{.Name}},
+		{{- end}}
+		{{- end}}
+		    "updated_at": time.Now(),
+		},
+	}
+
+    _, err := s.Collection.UpdateByID(ctx, {{.LowerName}}.ID, update)
+	return &{{.LowerName}}, err
+}
+
+// Delete removes a {{.LowerName}} by ID
+func (s *{{.Name}}Service) Delete(ctx context.Context, id string) error {
+
+	//  initalizing colleciton
+	New{{.Name}}Service()
+
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return fmt.Errorf("invalid ID: %w", err)
+	}
+
+	result, err := s.Collection.DeleteOne(ctx, bson.M{"_id": objID})
+	if err != nil {
+		return err
+	}
+
+	if result.DeletedCount == 0 {
+		return errors.New("no document deleted")
+	}
+
+	return nil
 }

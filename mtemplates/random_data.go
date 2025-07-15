@@ -125,6 +125,11 @@ func CamelToSnake(s string) string {
 	return strings.ToLower(snake)
 }
 
+// CamelToSnake converts CamelCase or PascalCase to snake_case
+func ToLowerCaseName(s string) string {
+	return strings.ToLower(s)
+}
+
 var FuncMap = template.FuncMap{
 	"camelToSnake":            CamelToSnake,            // Register CamelToSnake function
 	"add":                     add,                     // Register Add function
@@ -143,7 +148,8 @@ var FuncMap = template.FuncMap{
 	"randomBool":              randomBool,              // Register random bool function
 	"replaceString":           replaceString,           // Register hyphen with underscore
 	"replaceStringCapitalize": replaceStringCapitalize, // Register hyphen with underscore
-	"formatSliceToString":     formatSliceToString,     // Register format slice to string function
+	"formatSliceToString":     formatSliceToString,     // Register format slice to string functionD
+	"toLowerCaseName":         ToLowerCaseName,         // Register format slice to string functionD
 }
 
 func add(a int, b int) int {
