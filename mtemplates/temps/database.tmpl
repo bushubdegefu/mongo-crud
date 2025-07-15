@@ -1,0 +1,77 @@
+package database
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"strings"
+	"time"
+
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+    "go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
+	"{{.ProjectName}}/configs"
+)
+
+var (
+	MongoClient *mongo.Client
+)
+
+func LoggerFile(appName string) (*os.File, error) {
+	logFileName := fmt.Sprintf("%s_mongo.log", appName)
+	logFile, err := os.OpenFile(logFileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+	return logFile, nil
+}
+
+func ReturnMongoClient(appName string) (*mongo.Client, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	envName := fmt.Sprintf("%s_DB_TYPE", strings.ToUpper(appName))
+	dbType := configs.AppConfig.Get(envName)
+	if dbType != "mongodb" {
+		return nil, fmt.Errorf("database type not supported for MongoDB client: %s", dbType)
+	}
+
+	mongoURI := configs.AppConfig.Get(fmt.Sprintf("%s_MONGODB_URI", strings.ToUpper(appName)))
+	if mongoURI == "" {
+		return nil, fmt.Errorf("mongo uri is empty")
+	}
+
+	logFile, err := LoggerFile(appName)
+	if err != nil {
+		return nil, err
+	}
+	logger := log.New(logFile, "", log.LstdFlags|log.Lshortfile)
+
+	// Mongo client options with connection pool and timeouts
+	clientOpts := options.Client().
+		ApplyURI(mongoURI).
+		SetConnectTimeout(10 * time.Second).
+		SetMaxPoolSize(100).           // max number of connections in the pool
+		SetMinPoolSize(10).            // min number of connections in the pool
+		SetMaxConnIdleTime(5 * time.Minute) // max idle time for a connection before being closed
+
+	// Enable OpenTelemetry instrumentation on Mongo client command monitoring
+	clientOpts.Monitor = otelmongo.NewMonitor()
+
+	client, err := mongo.Connect(ctx, clientOpts)
+	if err != nil {
+		logger.Printf("Error connecting to MongoDB: %v", err)
+		return nil, err
+	}
+
+	if err := client.Ping(ctx, nil); err != nil {
+		logger.Printf("Error pinging MongoDB: %v", err)
+		return nil, err
+	}
+
+	MongoClient = client
+	logger.Printf("MongoDB connection established")
+
+	return client, nil
+}

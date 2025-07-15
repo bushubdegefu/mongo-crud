@@ -37,12 +37,14 @@ var (
 				// If no module name, fetch the project name
 				if moduleName == "" {
 					mtemplates.InitProjectJSON()
-
+					mtemplates.RenderData.ProjectName = mtemplates.ProjectSettings.ProjectName
+				} else {
+					mtemplates.RenderData.ProjectName = moduleName
 				}
 
+				fmt.Println(moduleName)
 				// Get current working directory
 				currentDir, _ := os.Getwd()
-				mtemplates.RenderData.ProjectName = moduleName
 				generate.GenerateMainAndManager(mtemplates.RenderData)
 				generate.GenerateConfig(mtemplates.RenderData)
 
@@ -65,7 +67,6 @@ var (
 			generate.GenerateConfig(mtemplates.RenderData)
 			generate.GenerateConfigEnv(mtemplates.RenderData)
 			generate.GenerateConfigAppEnv(mtemplates.RenderData)
-
 		},
 	}
 
@@ -126,7 +127,14 @@ func handleProjectType(projectType, frame string, cmd *cobra.Command) {
 	case "service":
 		basiccmd()
 		mtemplates.CommonCMD()
-
+	case "db":
+		mtemplates.InitProjectJSON()
+		generate.GenerateDBConn(mtemplates.ProjectSettings)
+	case "config":
+		mtemplates.InitProjectJSON()
+		mtemplates.RenderData.AppNames = mtemplates.ProjectSettings.AppNames
+		generate.GenerateConfig(mtemplates.RenderData)
+		generate.GenerateConfigAppEnv(mtemplates.RenderData)
 	default:
 		fmt.Println(frame)
 		// fmt.Printf("Args: %#v\n", args)
@@ -139,7 +147,7 @@ func handleProjectType(projectType, frame string, cmd *cobra.Command) {
 }
 
 func basiccmd() {
-	mtemplates.InitProjectJSON()
+
 	generate.GitFrame(mtemplates.RenderData)
 	generate.HaproxyFrame(mtemplates.RenderData)
 	generate.DockerFrame(mtemplates.RenderData)
@@ -153,7 +161,7 @@ func init() {
 	initalizemodule.Flags().StringP("type", "t", "", "specify if you are using standalone authentication like django admin or sso like solution")
 
 	// Register flags for the 'basic' command
-	basicCommand.Flags().StringP("type", "t", "", "Specify the type of folder structure to generate: rsa, db, producer,logs, consumer, tasks, pagination, otel,migration")
+	basicCommand.Flags().StringP("type", "t", "", "Specify the type of folder structure to generate: rsa, db, producer,logs, consumer, tasks, pagination, otel,migration,config")
 	basicCommand.Flags().StringP("frame", "f", "", "Specify the Spanner function you want for the tracer, echo/fiber, meant to be used with otel flag")
 	basicCommand.Flags().StringP("name", "n", "", "Specify the project module name as in github.com/someuser/someproject for the json template generation")
 	basicCommand.Flags().StringP("app", "a", "", "Specify the app name, all it will try to generate for all jsons")

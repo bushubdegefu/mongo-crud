@@ -49,7 +49,7 @@ func WriteTemplateToFileModel(filePath string, tmpl *template.Template, data Mod
 }
 
 func LoadTemplate(name string) *template.Template {
-	tmplContent, err := TemplateFS.ReadFile("temps" + name + ".tmpl")
+	tmplContent, err := TemplateFS.ReadFile("temps/" + name + ".tmpl")
 	if err != nil {
 		panic(fmt.Errorf("failed to read embedded template: %w", err))
 	}
