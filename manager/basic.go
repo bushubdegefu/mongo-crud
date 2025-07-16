@@ -130,11 +130,28 @@ func handleProjectType(projectType, frame string, cmd *cobra.Command) {
 	case "db":
 		mtemplates.InitProjectJSON()
 		generate.GenerateDBConn(mtemplates.ProjectSettings)
+		generate.GenerateCommon(mtemplates.RenderData)
 	case "config":
 		mtemplates.InitProjectJSON()
 		mtemplates.RenderData.AppNames = mtemplates.ProjectSettings.AppNames
 		generate.GenerateConfig(mtemplates.RenderData)
 		generate.GenerateConfigAppEnv(mtemplates.RenderData)
+	case "tracer":
+		mtemplates.InitProjectJSON()
+		mtemplates.RenderData.ProjectName = mtemplates.ProjectSettings.ProjectName
+		generate.GenerateTracerEchoSetup(mtemplates.RenderData)
+	case "logs":
+		mtemplates.InitProjectJSON()
+		mtemplates.RenderData.ProjectName = mtemplates.ProjectSettings.ProjectName
+		generate.GenerateLogs(mtemplates.RenderData)
+	case "tasks":
+		appName, _ := cmd.Flags().GetString("app")
+		if appName == "" {
+			fmt.Println("tasks flag need additional flag app")
+		} else {
+			generate.GenerateTasks(mtemplates.RenderData)
+			mtemplates.CommonCMD()
+		}
 	default:
 		fmt.Println(frame)
 		// fmt.Printf("Args: %#v\n", args)

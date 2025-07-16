@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/bson"
+	"github.com/jinzhu/copier"
 )
 
 // UserService wraps MongoDB logic for users
@@ -32,8 +33,7 @@ func New{{.Name}}Service() (*{{.Name}}Service, error) {
 
 // Create inserts a new {{.LowerName}}
 func (s *{{.Name}}Service) Create(ctx context.Context, posted_{{.LowerName}} *models.{{.Name}}Post) (*models.{{.Name}}, error) {
-	//  initalizing colleciton
-	New{{.Name}}Service()
+	
 	{{.LowerName}} := models.{{.Name}}{
     	{{- range .Fields}} {{- if .Post}}
     	    {{.Name}}:  posted_{{.ModelName | toLowerCaseName }}.{{.Name}},
@@ -46,8 +46,7 @@ func (s *{{.Name}}Service) Create(ctx context.Context, posted_{{.LowerName}} *mo
 
 // GetOne fetches a {{.LowerName}} by ID
 func (s *{{.Name}}Service) GetOne(ctx context.Context, id string) (*models.{{.Name}}, error) {
-	//  initalizing colleciton
-	New{{.Name}}Service()
+	
 	objID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid ID: %w", err)
@@ -63,16 +62,16 @@ func (s *{{.Name}}Service) GetOne(ctx context.Context, id string) (*models.{{.Na
 }
 
 // Get returns {{.LowerName}}s with pagination and search
-func (s *{{.Name}}Service) Get(ctx context.Context, pagination models.Pagination, searchFields []string, searchTerm string) ([]models.{{.Name}}, error) {
-	//  initalizing colleciton
-	New{{.Name}}Service()
+func (s *{{.Name}}Service) Get(ctx context.Context, pagination models.Pagination, searchFields []string, searchTerm []string) ([]models.{{.Name}}, uint, error) {
 
 	// Build search query
 	filter := bson.M{}
-	if searchTerm != "" && len(searchFields) > 0 {
+		if len(searchTerm) > 0 && len(searchFields) > 0{
 		var orConditions []bson.M
-		for _, field := range searchFields {
-			orConditions = append(orConditions, bson.M{field: bson.M{"$regex": searchTerm, "$options": "i"}})
+		for index, term := range searchFields {
+			orConditions = append(orConditions, bson.M{
+				searchFields[index]: bson.M{"$regex": term, "$options": "i"},
+			})
 		}
 		filter["$or"] = orConditions
 	}
@@ -81,9 +80,12 @@ func (s *{{.Name}}Service) Get(ctx context.Context, pagination models.Pagination
 		SetSkip(int64(pagination.Offset + pagination.Page*pagination.Size)).
 		SetLimit(int64(pagination.Size))
 
+	// Count all documents (no filter)
+	totalCount, _ := s.Collection.CountDocuments(ctx, filter)
+
 	cursor, err := s.Collection.Find(ctx, filter, opts)
 	if err != nil {
-		return nil, err
+		return nil,uint(totalCount), err
 	}
 	defer cursor.Close(ctx)
 
@@ -91,42 +93,39 @@ func (s *{{.Name}}Service) Get(ctx context.Context, pagination models.Pagination
 	for cursor.Next(ctx) {
 		var u models.{{.Name}}
 		if err := cursor.Decode(&u); err != nil {
-			return nil, err
+			return nil, uint(totalCount), err
 		}
 		{{.LowerName}}s = append({{.LowerName}}s, u)
 	}
 
-	return {{.LowerName}}s, nil
+	return {{.LowerName}}s,uint(totalCount), nil
 }
 
 // Update modifies a {{.Name}}s by ID
-func (s *{{.Name}}Service) Update(ctx context.Context, {{.LowerName}} *models.{{.Name}}Patch) (*models.{{.Name}}, error) {
-	//  initalizing colleciton
-	New{{.Name}}Service()
-
-	if {{.LowerName}}.ID.IsZero() {
+func (s *{{.Name}}Service) Update(ctx context.Context, patch_{{.LowerName}} *models.{{.Name}}Patch) (*models.{{.Name}}, error) {
+	
+	if patch_{{.LowerName}}.ID.IsZero() {
 		return nil, errors.New("{{.LowerName}} ID is missing")
 	}
 
 	update := bson.M{
 		"$set": bson.M{
 		{{- range .Fields}} {{- if .Patch}}
-		    "{{.Name | camelToSnake }}": {{.ModelName | toLowerCaseName }}.{{.Name}},
+		    "{{.Name | camelToSnake }}": patch_{{.ModelName | toLowerCaseName }}.{{.Name}},
 		{{- end}}
 		{{- end}}
 		    "updated_at": time.Now(),
 		},
 	}
 
-    _, err := s.Collection.UpdateByID(ctx, {{.LowerName}}.ID, update)
-	return &{{.LowerName}}, err
+    _, err := s.Collection.UpdateByID(ctx, patch_{{.LowerName}}.ID, update)
+	{{.LowerName}} := &models.{{.Name }}{}
+	copier.Copy(&{{.LowerName | toLowerCaseName }}, patch_{{.LowerName}})
+	return {{.LowerName}}, err
 }
 
 // Delete removes a {{.LowerName}} by ID
 func (s *{{.Name}}Service) Delete(ctx context.Context, id string) error {
-
-	//  initalizing colleciton
-	New{{.Name}}Service()
 
 	objID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {

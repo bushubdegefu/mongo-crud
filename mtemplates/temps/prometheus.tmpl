@@ -7,12 +7,7 @@ import (
 	"time"
 
 	"{{.ProjectName}}/configs"
-{{- if  eq .Frame  "fiber" }}
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/adaptor"
-{{- else if  eq .Frame  "echo" }}
 	"github.com/labstack/echo/v4"
-{{- end}}
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/shirou/gopsutil/cpu"
@@ -83,31 +78,7 @@ func collectSystemMetrics() {
 		time.Sleep(5 * time.Second)
 	}
 }
-{{- if  eq .Frame  "fiber" }}
-func RegisterMetricsHandler(prom *prometheus.Registry) http.Handler {
-	// Return the handler for Prometheus scraping using the custom registry
-	return promhttp.HandlerFor(prom, promhttp.HandlerOpts{})
-}
 
-func SetupPrometheusMetrics(app *fiber.App) {
-	// Initialize Prometheus registry
-	prom := prometheus.NewRegistry()
-	InitProm(prom)
-
-	// Middleware to track HTTP request duration
-	app.Use(func(c *fiber.Ctx) error {
-		start := time.Now()
-		err := c.Next()
-		duration := time.Since(start).Seconds()
-
-		httpDuration.WithLabelValues(c.Method(), c.Path(), fmt.Sprintf("%d", c.Response().StatusCode()), configs.AppConfig.Get("APP_NAME")).Observe(duration)
-		return err
-	})
-
-	// Expose the /metrics endpoint for Prometheus to scrape
-	app.Get("/metrics", adaptor.HTTPHandler(RegisterMetricsHandler(prom)))
-}
-{{- else if eq .Frame "echo"}}
 func RegisterMetricsHandler(prom *prometheus.Registry) http.Handler {
 	// Return the handler for Prometheus scraping using the custom registry
 	return promhttp.HandlerFor(prom, promhttp.HandlerOpts{})
@@ -147,4 +118,3 @@ func SetupPrometheusMetrics(app *echo.Echo) {
 	// Expose the /metrics endpoint for Prometheus to scrape
 	app.GET("/metrics", WrapHTTPHandler(RegisterMetricsHandler(prom)))
 }
-{{- end}}

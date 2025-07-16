@@ -11,8 +11,7 @@ import (
 type {{.Name}} struct {
     {{range .Fields}} {{.Name}} {{.Type}}  {{.BackTick}}{{.Annotation}}{{.BackTick}}
 	{{end}}
-	// The following fields will be ignored by Swagger
-   	CreatedAt time.Time {{.BackTick}}bson:"created_at,omitempty"{{.BackTick}}
+	CreatedAt time.Time {{.BackTick}}bson:"created_at,omitempty"{{.BackTick}}
     UpdatedAt time.Time {{.BackTick}}bson:"updated_at,omitempty"{{.BackTick}}
 }
 

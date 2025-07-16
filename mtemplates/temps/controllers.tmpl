@@ -1,0 +1,332 @@
+
+package controllers
+
+import (
+	{{- $break_math := false }}
+	{{- range .Relations }}
+	{{- if .MtM}}
+	{{- $break_math = true }}
+	{{- end}}
+	{{- end}}
+	{{- if $break_math }}
+	
+	{{ end }}
+	"net/http"
+	"strconv"
+
+	"github.com/go-playground/validator/v10"
+	"github.com/labstack/echo/v4"
+	"{{.ProjectName}}/common"
+	"{{.ProjectName}}/{{.AppName}}/models"
+	"{{.ProjectName}}/{{.AppName}}/services"
+	"{{.ProjectName}}/observe"
+)
+
+// Get{{.Name}}s function to get a {{.Name}}s with pagination and searchFields
+// @Summary Get {{.Name}}s
+// @Description Get {{.Name}}s
+// @Tags {{.Name}}s
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Security Refresh
+// @Param page query int true "page"
+// @Param size query int true "page size"
+{{- range .SearchFields}}
+// @Param {{ . }} query string false "Search by {{ . }} optional field string"
+{{- end}}
+// @Success 200 {object} common.ResponsePagination{data=[]models.{{.Name}}Get}
+// @Failure 404 {object} common.ResponseHTTP{}
+// @Router /{{.AppName | replaceString}}/{{.LowerName}} [get]
+func Get{{.Name}}s(contx echo.Context) error {
+	//  Geting tracer
+	tracer := contx.Get("tracer").(*observe.RouteTracer)
+
+	//  parsing Query Prameters
+	Page, _ := strconv.Atoi(contx.QueryParam("page"))
+	Limit, _ := strconv.Atoi(contx.QueryParam("size"))
+	//  checking if query parameters  are correct
+	if Page == 0 || Limit == 0 {
+		return contx.JSON(http.StatusBadRequest, common.ResponseHTTP{
+			Success: false,
+			Message: "Not Allowed, Bad request",
+			Data:    nil,
+		})
+	}
+
+	// Getting search fields
+	searchTerm := make(map[string]any)
+		if err := contx.Bind(&searchTerm); err != nil {
+			return contx.JSON(http.StatusBadRequest, common.ResponseHTTP{
+				Success: false,
+				Message: err.Error(),
+				Data:    nil,
+			})
+		}
+
+	searchFields := []string{"username", "email", "first_name", "last_name"}
+	filteredSearchTerm := common.FilterSearchTerms(searchTerm, searchFields)
+   
+	// Initialize {{.Name}}Service
+	{{.LowerName}}Service, err := services.New{{.Name}}Service()
+	if err != nil {
+		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
+			Success: false,
+			Message: "Failed to initialize user service",
+		})
+	}
+
+	// Prepare pagination model
+	pagination := models.Pagination{
+		Page:   Page - 1, // assuming pages are 0-indexed in backend
+		Size:   Limit,
+		Offset: 0, // not used in service so set to 0
+	}
+
+	// Fetch {{.LowerName}}s from service
+	{{.LowerName}}s,totalCount, err := {{.LowerName}}Service.Get(tracer.Tracer, pagination, searchFields, filteredSearchTerm)
+	if err != nil {
+		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
+			Success: false,
+			Message: err.Error(),
+		})
+	}
+
+	// Send paginated response
+	return contx.JSON(http.StatusOK, common.ResponsePagination{
+		Success: true,
+		Message: "Successfully retrieved users.",
+		Items:   {{.LowerName}}s,
+		Total:   totalCount,
+		Page:    uint(Page),
+		Size:    uint(Limit),
+	})
+}
+
+
+
+// Get{{.Name}}ByID is a function to get a {{.Name}}s by ID
+// @Summary Get {{.Name}} by ID
+// @Description Get {{.LowerName}} by ID
+// @Tags {{.Name}}s
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Param {{.LowerName}}_id path string true "{{.Name}} ID"
+// @Success 200 {object} common.ResponseHTTP{data=models.{{.Name}}Get}
+// @Failure 404 {object} common.ResponseHTTP{}
+// @Router /{{.AppName | replaceString}}/{{.LowerName}}/{{ "{" }}{{.LowerName}}_id{{ "}" }} [get]
+func Get{{.Name}}ByID(contx echo.Context) error {
+	//  Geting tracer
+		tracer := contx.Get("tracer").(*observe.RouteTracer)
+
+
+	//  parsing Query Prameters
+	id := contx.Param("{{.LowerName}}_id")
+
+    // Initialize {{.Name}}Service
+	{{.LowerName}}Service, err := services.New{{.Name}}Service()
+	if err != nil {
+		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
+			Success: false,
+			Message: "Failed to initialize user service",
+		})
+	}
+
+    // Fetch {{.LowerName}} from service
+	{{.LowerName}}, err := {{.LowerName}}Service.GetOne(tracer.Tracer, id)
+	if err != nil {
+		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
+			Success: false,
+			Message: err.Error(),
+		})
+	}
+
+	// Send paginated response
+	return contx.JSON(http.StatusOK, common.ResponseHTTP{
+		Success: true,
+		Message: "Successfully retrieved users.",
+		Data:   {{.LowerName}},
+	})
+	
+	
+}
+
+// Add {{.Name}} to data
+// @Summary Add a new {{.Name}}
+// @Description Add {{.Name}}
+// @Tags {{.Name}}s
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Param {{.LowerName}} body models.{{.Name}}Post true "Add {{.Name}}"
+// @Success 200 {object} common.ResponseHTTP{data=models.{{.Name}}Post}
+// @Failure 400 {object} common.ResponseHTTP{}
+// @Failure 500 {object} common.ResponseHTTP{}
+// @Router /{{.AppName | replaceString}}/{{.LowerName}} [post]
+func Post{{.Name}}(contx echo.Context) error {
+	//  Geting tracer
+		tracer := contx.Get("tracer").(*observe.RouteTracer)
+
+	// validator initialization
+	validate := validator.New()
+
+	//validating post data
+	posted_{{.LowerName}} := new(models.{{.Name}}Post)
+
+	//first parse request data
+	if err := contx.Bind(&posted_{{.LowerName}}); err != nil {
+		return contx.JSON(http.StatusBadRequest, common.ResponseHTTP{
+			Success: false,
+			Message: err.Error(),
+			Data:    nil,
+		})
+	}
+
+	// then validate structure
+	if err := validate.Struct(posted_{{.LowerName}}); err != nil {
+		return contx.JSON(http.StatusBadRequest, common.ResponseHTTP{
+			Success: false,
+			Message: err.Error(),
+			Data:    nil,
+		})
+	}
+
+      // Initialize {{.Name}}Service
+	{{.LowerName}}Service, err := services.New{{.Name}}Service()
+	if err != nil {
+		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
+			Success: false,
+			Message: "Failed to initialize user service",
+		})
+	}
+
+    // post {{.LowerName}} from service
+	{{.LowerName}}, err := {{.LowerName}}Service.Create(tracer.Tracer, posted_{{.LowerName}})
+	if err != nil {
+		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
+			Success: false,
+			Message: err.Error(),
+		})
+	}
+	
+	
+	// return data if transaction is sucessfull
+	return contx.JSON(http.StatusOK, common.ResponseHTTP{
+		Success: true,
+		Message: "{{.Name}} created successfully.",
+		Data:    {{.LowerName}},
+	})
+}
+
+// Patch {{.Name}} to data
+// @Summary Patch {{.Name}}
+// @Description Patch {{.Name}}
+// @Tags {{.Name}}s
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Param {{.LowerName}} body models.{{.Name}}Patch true "Patch {{.Name}}"
+// @Param {{.LowerName}}_id path string true "{{.Name}} ID"
+// @Success 200 {object} common.ResponseHTTP{data=models.{{.Name}}Patch}
+// @Failure 400 {object} common.ResponseHTTP{}
+// @Failure 500 {object} common.ResponseHTTP{}
+// @Router /{{.AppName | replaceString}}/{{.LowerName}}/{{ "{" }}{{.LowerName}}_id{{ "}" }} [patch]
+func Patch{{.Name}}(contx echo.Context) error {
+	//  Geting tracer
+	tracer := contx.Get("tracer").(*observe.RouteTracer)
+
+	// validator initialization
+	validate := validator.New()
+
+	// validate data struct
+	patch_{{.LowerName}} := new(models.{{.Name}}Patch)
+	if err := contx.Bind(&patch_{{.LowerName}}); err != nil {
+		return contx.JSON(http.StatusBadRequest, common.ResponseHTTP{
+			Success: false,
+			Message: err.Error(),
+			Data:    nil,
+		})
+	}
+
+    // then validate structure
+	if err := validate.Struct(patch_{{.LowerName}}); err != nil {
+		return contx.JSON(http.StatusBadRequest, common.ResponseHTTP{
+			Success: false,
+			Message: err.Error(),
+			Data:    nil,
+		})
+	}
+	
+
+	{{.LowerName}}Service, err := services.New{{.Name}}Service()
+	if err != nil {
+		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
+			Success: false,
+			Message: "Failed to initialize user service",
+		})
+	}
+
+    // patch {{.LowerName}} from service
+	{{.LowerName}}, err := {{.LowerName}}Service.Update(tracer.Tracer, patch_{{.LowerName}})
+	if err != nil {
+		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
+			Success: false,
+			Message: err.Error(),
+		})
+	}
+	
+	
+	// return data if transaction is sucessfull
+	return contx.JSON(http.StatusOK, common.ResponseHTTP{
+		Success: true,
+		Message: "{{.Name}} updated successfully.",
+		Data:    {{.LowerName}},
+	})
+}
+
+
+// Delete{{.Name}}s function removes a {{.LowerName}} by ID
+// @Summary Remove {{.Name}} by ID
+// @Description Remove {{.LowerName}} by ID
+// @Tags {{.Name}}s
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Param {{.LowerName}}_id path string true "{{.Name}} ID"
+// @Success 200 {object} common.ResponseHTTP{}
+// @Failure 404 {object} common.ResponseHTTP{}
+// @Failure 503 {object} common.ResponseHTTP{}
+// @Router /{{.AppName | replaceString}}/{{.LowerName}}/{{ "{" }}{{.LowerName}}_id{{ "}" }} [delete]
+func Delete{{.Name}}(contx echo.Context) error {
+	//  Geting tracer
+		tracer := contx.Get("tracer").(*observe.RouteTracer)
+
+	// validate path params
+	id:= contx.Param("{{.LowerName}}_id")
+	
+    {{.LowerName}}Service, err := services.New{{.Name}}Service()
+	if err != nil {
+		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
+			Success: false,
+			Message: "Failed to initialize user service",
+		})
+	}
+
+    // delete {{.LowerName}} from service
+	err = {{.LowerName}}Service.Delete(tracer.Tracer, id)
+	if err != nil {
+		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
+			Success: false,
+			Message: err.Error(),
+		})
+	}
+	
+	
+	// Return success respons
+	return contx.JSON(http.StatusOK, common.ResponseHTTP{
+		Success: true,
+		Message: "{{.Name}} deleted successfully.",
+		Data:    nil,
+	})
+}

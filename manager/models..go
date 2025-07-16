@@ -15,8 +15,8 @@ var (
 	// Models command for generating data models
 	modelscli = &cobra.Command{
 		Use:   "models",
-		Short: "Generate data models based on GORM with annotations",
-		Long:  `This command generates data models using GORM, based on the provided spec in the config.json file, along with GORM relationship annotations.`,
+		Short: "Generate data models based on with annotations for mongo db documents",
+		Long:  `This command generates data models using GORM, based on the provided spec in the config.json file, along with relationship metadata for documents.`,
 		Run:   runModelsCommand,
 	}
 )
