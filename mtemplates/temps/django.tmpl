@@ -14,7 +14,7 @@
             "name": "ID",
             "type": " primitive.ObjectID",
             "annotation": "bson:\"_id,omitzero\" json:\"id,omitzero\"",
-            "curd_flag": "true$false$true$false$false$false"
+            "curd_flag": "true$false$false$false$false$false"
           },
           {
             "name": "Password",
@@ -74,13 +74,13 @@
             "name": "GroupIDs",
             "type": "[]primitive.ObjectID",
             "annotation": "bson:\"group_ids,omitempty\"    json:\"group_ids,omitzero\"",
-            "curd_flag": "true$true$true$true$false$false"
+            "curd_flag": "false$false$false$true$false$true"
           },
           {
             "name": "PermissionIDs",
             "type": "[]primitive.ObjectID",
             "annotation": "bson:\"permission_ids,omitempty\" json:\"permission_ids,omitempty\"",
-            "curd_flag": "true$true$true$true$false$false"
+            "curd_flag": "false$false$false$false$false$true"
           }
         ]
       },
@@ -95,19 +95,19 @@
             "name": "ID",
             "type": " primitive.ObjectID",
             "annotation": "bson:\"_id,omitzero\" json:\"id,omitzero\"",
-            "curd_flag": "true$false$true$false$false$false"
+            "curd_flag": "true$false$false$false$false$false"
           },
           {
             "name": "Name",
             "type": "string",
             "annotation": "bson:\"name,omitzero\" json:\"name,omitzero\"",
-            "curd_flag": "false$true$true$true$false$false"
+            "curd_flag": "true$true$true$true$false$false"
           },
           {
             "name": "PermissionIDs",
-            "type": "time.Time",
+            "type": "[]primitive.ObjectID",
             "annotation": "bson:\"permission_ids,omitzero\" json:\"permission_ids,omitzero\"",
-            "curd_flag": "true$false$false$false$false$false"
+            "curd_flag": "true$false$false$false$false$true"
           }
         
         ]
@@ -121,7 +121,7 @@
             "name": "ID",
             "type": " primitive.ObjectID",
             "annotation": "bson:\"_id,omitzero\" json:\"id,omitzero\"",
-            "curd_flag": "true$false$true$false$false$false"
+            "curd_flag": "true$false$false$false$false$false"
           },
           {
             "name": "Name",

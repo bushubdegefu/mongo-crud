@@ -18,41 +18,96 @@ import (
 // UserService wraps MongoDB logic for users
 type {{.Name}}Service struct {
 	Collection *mongo.Collection
+	Client     *mongo.Client
 }
+
 
 
 // Constructor
 func New{{.Name}}Service() (*{{.Name}}Service, error) {
-	client, err := database.ReturnMongoClient("{{ $.AppName }}")
+	client, err := database.ReturnMongoClient("{{ $.AppName |  replaceString }}")
 	if err != nil {
 		return &{{.Name}}Service{}, err
 	}
-	collection := client.Database("{{ $.AppName }}").Collection("{{.Name}}s")
-	return &{{.Name}}Service{Collection: collection}, nil
+	collection := client.Database("{{ $.AppName | replaceString }}").Collection("{{.Name}}s")
+	return &{{.Name}}Service{
+		Collection: collection,
+		Client:     client,
+	}, nil
 }
 
+
+// Utility function for transactions
+func (s *{{.Name}}Service) withTransaction(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
+	session, err := s.Client.StartSession()
+	if err != nil {
+		return fmt.Errorf("start session failed: %w", err)
+	}
+	defer session.EndSession(ctx)
+
+	return mongo.WithSession(ctx, session, func(sc mongo.SessionContext) error {
+		if err := session.StartTransaction(); err != nil {
+			return err
+		}
+		if err := fn(sc); err != nil {
+			session.AbortTransaction(sc)
+			return err
+		}
+		return session.CommitTransaction(sc)
+	})
+}
+
+
 // Create inserts a new {{.LowerName}}
-func (s *{{.Name}}Service) Create(ctx context.Context, posted_{{.LowerName}} *models.{{.Name}}Post) (*models.{{.Name}}, error) {
+func (s *{{.Name}}Service) Create(ctx context.Context, posted_{{.LowerName}} *models.{{.Name}}Post) (*models.{{.Name}}Get, error) {
+	var created{{.Name}} models.{{.Name}}Get
 	
-	{{.LowerName}} := models.{{.Name}}{
-    	{{- range .Fields}} {{- if .Post}}
-    	    {{.Name}}:  posted_{{.ModelName | toLowerCaseName }}.{{.Name}},
-    	{{- end}}
-    	{{- end}}
-        }
-	_, err := s.Collection.InsertOne(ctx, {{.LowerName}})
-	return &{{.LowerName}}, err
+	err := s.withTransaction(ctx, func(sc mongo.SessionContext) error {
+			{{- range .Fields}} {{- if .Post}}
+				{{- if eq .Name "Password" }}
+			hashedPassword := models.HashFunc(posted_user.Password)
+					{{- end }}
+				{{- end }}
+			{{- end }}
+
+			{{.LowerName}} := models.{{.Name}}{
+					ID: primitive.NewObjectID(),
+			{{- range .Fields}} {{- if .Post}}
+				{{- if eq .Name "Password" }}
+					{{.Name}}:  hashedPassword,
+				{{- else if eq .Name "ID" }}
+					{{.Name}}:  primitive.NewObjectID(),
+				{{- else }}
+					{{.Name}}:  posted_{{.ModelName | toLowerCaseName }}.{{.Name}},
+				{{- end	}}
+			{{- end}}
+			{{- end}}
+					CreatedAt:   time.Now(),
+			}
+
+
+			_, err := s.Collection.InsertOne(ctx, {{.LowerName}})
+			if err != nil {
+				return fmt.Errorf("insert failed: %w", err)
+			}
+
+			copier.Copy(created{{.Name}},{{.LowerName}})
+			
+			return nil
+		})
+
+		return &created{{.Name}}, err
 }
 
 // GetOne fetches a {{.LowerName}} by ID
-func (s *{{.Name}}Service) GetOne(ctx context.Context, id string) (*models.{{.Name}}, error) {
+func (s *{{.Name}}Service) GetOne(ctx context.Context, id string) (*models.{{.Name}}Get, error) {
 	
 	objID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid ID: %w", err)
 	}
 
-	var {{.LowerName}} models.{{.Name}}
+	var {{.LowerName}} models.{{.Name}}Get
 	err = s.Collection.FindOne(ctx, bson.M{"_id": objID}).Decode(&{{.LowerName}})
 	if err != nil {
 		return nil, err
@@ -62,13 +117,13 @@ func (s *{{.Name}}Service) GetOne(ctx context.Context, id string) (*models.{{.Na
 }
 
 // Get returns {{.LowerName}}s with pagination and search
-func (s *{{.Name}}Service) Get(ctx context.Context, pagination models.Pagination, searchFields []string, searchTerm []string) ([]models.{{.Name}}, uint, error) {
+func (s *{{.Name}}Service) Get(ctx context.Context, pagination models.Pagination, searchFields []string, searchTerm []string) ([]models.{{.Name}}Get, uint, error) {
 
-	// Build search query
+	// Build search query if any
 	filter := bson.M{}
-		if len(searchTerm) > 0 && len(searchFields) > 0{
+	if  len(searchTerm) > 0 && len(searchFields) > 0 && len(searchFields) >= len(searchTerm) {
 		var orConditions []bson.M
-		for index, term := range searchFields {
+		for index, term := range searchTerm {
 			orConditions = append(orConditions, bson.M{
 				searchFields[index]: bson.M{"$regex": term, "$options": "i"},
 			})
@@ -76,8 +131,10 @@ func (s *{{.Name}}Service) Get(ctx context.Context, pagination models.Pagination
 		filter["$or"] = orConditions
 	}
 
+	//pagination logic
+	skip := int64(pagination.Page * pagination.Size)
 	opts := options.Find().
-		SetSkip(int64(pagination.Offset + pagination.Page*pagination.Size)).
+		SetSkip(skip).
 		SetLimit(int64(pagination.Size))
 
 	// Count all documents (no filter)
@@ -89,9 +146,9 @@ func (s *{{.Name}}Service) Get(ctx context.Context, pagination models.Pagination
 	}
 	defer cursor.Close(ctx)
 
-	var {{.LowerName}}s []models.{{.Name}}
+	var {{.LowerName}}s []models.{{.Name}}Get
 	for cursor.Next(ctx) {
-		var u models.{{.Name}}
+		var u models.{{.Name}}Get
 		if err := cursor.Decode(&u); err != nil {
 			return nil, uint(totalCount), err
 		}
@@ -102,44 +159,72 @@ func (s *{{.Name}}Service) Get(ctx context.Context, pagination models.Pagination
 }
 
 // Update modifies a {{.Name}}s by ID
-func (s *{{.Name}}Service) Update(ctx context.Context, patch_{{.LowerName}} *models.{{.Name}}Patch) (*models.{{.Name}}, error) {
+func (s *{{.Name}}Service) Update(ctx context.Context, patch_{{.LowerName}} *models.{{.Name}}Patch, id string) (*models.{{.Name}}Get, error) {
+	// update User
+	var updated{{.Name}} *models.{{.Name}}Get
+
+	{{.LowerName}}_id, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return &models.{{.Name}}Get{},fmt.Errorf("invalid ID: %w", err)
+	}
+
+	err = s.withTransaction(ctx, func(sc mongo.SessionContext) error {
+			updateFields := bson.M{}
+			{{- range .Fields}} {{- if .Patch}}
+			{{- if eq .Name "Password" }}
+			if patch_{{$.LowerName}}.{{.Name}} != nil {
+				// setting password string to hash
+				hashedPassword := models.HashFunc(*patch_{{$.LowerName}}.Password)
+				updateFields["{{.Name | camelToSnake }}"] = hashedPassword
+			}
+			{{- else if eq .Name "ID" }}
+				
+			{{- else }}
+			if patch_{{$.LowerName}}.{{.Name}} != nil {
+				updateFields["{{.Name | camelToSnake }}"] = *patch_{{$.LowerName}}.{{.Name}}
+			}
+			{{- end	}}
+			{{- end}}
+			{{- end}}
+			updateFields["updated_at"]=time.Now()
+				
+			
+			// filter to use to update value by 
+			filter{{.Name}} := bson.M{"_id": {{.LowerName}}_id}
+			update{{.Name}} := bson.M{"$set": updateFields}
+			// Update the document by ID
+			_, err := s.Collection.UpdateOne(ctx, filter{{.Name}}, update{{.Name}})
+			if err != nil {
+				return fmt.Errorf("insert failed: %w", err)
+			}
 	
-	if patch_{{.LowerName}}.ID.IsZero() {
-		return nil, errors.New("{{.LowerName}} ID is missing")
-	}
-
-	update := bson.M{
-		"$set": bson.M{
-		{{- range .Fields}} {{- if .Patch}}
-		    "{{.Name | camelToSnake }}": patch_{{.ModelName | toLowerCaseName }}.{{.Name}},
-		{{- end}}
-		{{- end}}
-		    "updated_at": time.Now(),
-		},
-	}
-
-    _, err := s.Collection.UpdateByID(ctx, patch_{{.LowerName}}.ID, update)
-	{{.LowerName}} := &models.{{.Name }}{}
-	copier.Copy(&{{.LowerName | toLowerCaseName }}, patch_{{.LowerName}})
-	return {{.LowerName}}, err
+			return nil
+		})
+	
+	copier.Copy(&updated{{.Name}}, patch_{{.LowerName}})
+	return updated{{.Name}}, err
 }
 
 // Delete removes a {{.LowerName}} by ID
 func (s *{{.Name}}Service) Delete(ctx context.Context, id string) error {
 
-	objID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		return fmt.Errorf("invalid ID: %w", err)
-	}
+	err := s.withTransaction(ctx, func(sc mongo.SessionContext) error {
+		objID, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			return fmt.Errorf("invalid ID: %w", err)
+		}
 
-	result, err := s.Collection.DeleteOne(ctx, bson.M{"_id": objID})
-	if err != nil {
-		return err
-	}
+		result, err := s.Collection.DeleteOne(ctx, bson.M{"_id": objID})
+		if err != nil {
+			return err
+		}
 
-	if result.DeletedCount == 0 {
-		return errors.New("no document deleted")
-	}
+		if result.DeletedCount == 0 {
+			return errors.New("no document deleted")
+		}
 
-	return nil
+		return nil
+	})
+
+	return err
 }

@@ -135,6 +135,7 @@ func handleProjectType(projectType, frame string, cmd *cobra.Command) {
 		mtemplates.InitProjectJSON()
 		mtemplates.RenderData.AppNames = mtemplates.ProjectSettings.AppNames
 		generate.GenerateConfig(mtemplates.RenderData)
+		generate.GenerateConfigEnv(mtemplates.RenderData)
 		generate.GenerateConfigAppEnv(mtemplates.RenderData)
 	case "tracer":
 		mtemplates.InitProjectJSON()

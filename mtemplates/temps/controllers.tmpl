@@ -80,7 +80,6 @@ func Get{{.Name}}s(contx echo.Context) error {
 	pagination := models.Pagination{
 		Page:   Page - 1, // assuming pages are 0-indexed in backend
 		Size:   Limit,
-		Offset: 0, // not used in service so set to 0
 	}
 
 	// Fetch {{.LowerName}}s from service
@@ -239,6 +238,11 @@ func Patch{{.Name}}(contx echo.Context) error {
 	// validator initialization
 	validate := validator.New()
 
+    //getting object_id from path param
+    // validate path params
+	id:= contx.Param("{{.LowerName}}_id")
+
+
 	// validate data struct
 	patch_{{.LowerName}} := new(models.{{.Name}}Patch)
 	if err := contx.Bind(&patch_{{.LowerName}}); err != nil {
@@ -268,7 +272,7 @@ func Patch{{.Name}}(contx echo.Context) error {
 	}
 
     // patch {{.LowerName}} from service
-	{{.LowerName}}, err := {{.LowerName}}Service.Update(tracer.Tracer, patch_{{.LowerName}})
+	{{.LowerName}}, err := {{.LowerName}}Service.Update(tracer.Tracer, patch_{{.LowerName}},id)
 	if err != nil {
 		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
 			Success: false,
