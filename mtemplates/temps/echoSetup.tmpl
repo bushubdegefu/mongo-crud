@@ -42,6 +42,8 @@ func SetupRoutes(app *echo.Echo) {
 	// the Otel spanner middleware
 	gapp.Use(otelechospanstarter)
 
+	// db session injection
+	gapp.Use(dbsessioninjection)
 
 	{{- range .Models}}
 	gapp.GET("/{{.LowerName}}", controllers.Get{{.Name}}s).Name = "{{.AppName | replaceString}}_can_view_{{.LowerName}}"
@@ -49,6 +51,15 @@ func SetupRoutes(app *echo.Echo) {
 	gapp.POST("/{{.LowerName}}", controllers.Post{{.Name}}).Name = "{{.AppName | replaceString}}_can_add_{{.LowerName}}"
 	gapp.PATCH("/{{.LowerName}}/:{{.LowerName}}_id", controllers.Patch{{.Name}}).Name = "{{.AppName | replaceString}}_can_change_{{.LowerName}}"
 	gapp.DELETE("/{{.LowerName}}/:{{.LowerName}}_id", controllers.Delete{{.Name}}).Name = "{{.AppName | replaceString}}_can_delete_{{.LowerName}}"
+	
+	{{range .Relations}}
+	gapp.POST("/{{.LowerParentName}}{{.LowerFieldName}}/:{{.LowerFieldName}}_id/:{{.LowerParentName}}_id",controllers.Add{{.FieldName}}To{{.ParentName}}).Name = "{{.AppName | replaceString}}_can_add_{{.LowerFieldName}}"
+	gapp.DELETE("/{{.LowerParentName}}{{.LowerFieldName}}/:{{.LowerFieldName}}_id/:{{.LowerParentName}}_id",controllers.Delete{{.FieldName}}From{{.ParentName}}).Name = "{{.AppName | replaceString}}_can_delete_{{.LowerFieldName}}"
+	gapp.GET("/{{.LowerParentName}}{{.LowerFieldName}}/:{{.LowerParentName}}_id",controllers.Get{{.FieldName}}sOf{{.ParentName}}s).Name = "{{.AppName | replaceString}}_can_view_{{.LowerFieldName}}"
+	gapp.GET("/{{.LowerFieldName}}noncomplement{{.LowerParentName}}/:{{.LowerParentName}}_id",controllers.GetAll{{.FieldName}}sOf{{.ParentName}}s).Name = "{{.AppName | replaceString}}_can_view_{{.LowerFieldName}}complement"
+	gapp.GET("/{{.LowerFieldName}}complement{{.LowerParentName}}/:{{.LowerParentName}}_id",controllers.Get{{.FieldName}}Complement{{.ParentName}}s).Name = "{{.AppName | replaceString}}_can_view_{{.LowerFieldName}}complement"
+	{{end}}
+	
 	{{- end}}
 
 

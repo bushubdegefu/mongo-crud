@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"{{ .ProjectName }}/{{ $.AppName }}/models"
-	"{{ .ProjectName }}/database"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -19,23 +18,20 @@ import (
 type {{.Name}}Service struct {
 	Collection *mongo.Collection
 	Client     *mongo.Client
+	Database   *mongo.Database
 }
 
 
-
-// Constructor
-func New{{.Name}}Service() (*{{.Name}}Service, error) {
-	client, err := database.ReturnMongoClient("{{ $.AppName |  replaceString }}")
-	if err != nil {
-		return &{{.Name}}Service{}, err
-	}
-	collection := client.Database("{{ $.AppName | replaceString }}").Collection("{{.Name}}s")
+// Constructor For Client
+func New{{.Name}}Service(client *mongo.Client) (*{{.Name}}Service, error) {
+	database := client.Database("{{ $.AppName |  replaceString }}")
+	collection := database.Collection("{{.Name}}s")
 	return &{{.Name}}Service{
 		Collection: collection,
 		Client:     client,
+		Database:   database,
 	}, nil
 }
-
 
 // Utility function for transactions
 func (s *{{.Name}}Service) withTransaction(ctx context.Context, fn func(sc mongo.SessionContext) error) error {
@@ -228,3 +224,148 @@ func (s *{{.Name}}Service) Delete(ctx context.Context, id string) error {
 
 	return err
 }
+
+
+{{- range .Relations }}
+// ##########################################################
+// ##########  Relationship  Services to {{.FieldName}}
+// ##########################################################
+
+func (s *{{$.Name}}Service) Add{{$.Name}}To{{.FieldName}}(ctx context.Context, {{$.Name | toLowerCaseName}}ID, {{.LowerFieldName}}ID string) error {
+	{{$.Name | toLowerCaseName}}_id, err := primitive.ObjectIDFromHex({{$.Name | toLowerCaseName}}ID)
+	{{.LowerFieldName}}_id, err := primitive.ObjectIDFromHex({{.LowerFieldName}}ID)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.Collection.UpdateOne(ctx, bson.M{"_id": {{$.Name | toLowerCaseName}}_id}, bson.M{
+		"$addToSet": bson.M{"{{.LowerFieldName}}_ids": {{.LowerFieldName}}_id}, // Prevents duplicates
+	})
+	return err
+}
+
+func (s *{{ $.Name}}Service) Remove{{ $.Name}}From{{.FieldName}}(ctx context.Context, {{$.Name | toLowerCaseName}}ID, {{.LowerFieldName}}ID string) error {
+	{{$.Name | toLowerCaseName}}_id, err := primitive.ObjectIDFromHex({{$.Name | toLowerCaseName}}ID)
+	{{.LowerFieldName}}_id, err := primitive.ObjectIDFromHex({{.LowerFieldName}}ID)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.Collection.UpdateOne(ctx, bson.M{"_id": {{ $.Name | toLowerCaseName}}_id}, bson.M{
+		"$pull": bson.M{"{{.LowerFieldName}}_ids": {{.LowerFieldName}}_id},
+	})
+	return err
+}
+
+
+func (s *{{$.Name}}Service) Get{{$.Name}}{{.FieldName}}s(ctx context.Context, {{$.Name | toLowerCaseName}}ID string, pagination models.Pagination) ([]models.{{.FieldName}}, uint, error) {
+	{{$.Name | toLowerCaseName}}_id, _ := primitive.ObjectIDFromHex({{$.Name | toLowerCaseName}}ID)
+	var {{$.Name | toLowerCaseName}} models.{{$.Name}}
+	if err := s.Collection.FindOne(ctx, bson.M{"_id": {{$.Name | toLowerCaseName}}_id}).Decode(&{{$.Name | toLowerCaseName}}); err != nil {
+		return nil, 0, err
+	}
+
+	{{.LowerFieldName}}Collection := s.Database.Collection("{{.FieldName}}s")
+	filter := bson.M{"_id": bson.M{"$in": {{$.Name | toLowerCaseName}}.{{.FieldName}}IDs }}
+	opts := options.Find().
+		SetSkip(int64(pagination.Page * pagination.Size)).
+		SetLimit(int64(pagination.Size))
+
+	total, _ := {{.LowerFieldName}}Collection.CountDocuments(ctx, filter)
+
+	cursor, err := {{.LowerFieldName}}Collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer cursor.Close(ctx)
+
+	var {{.LowerFieldName}}s []models.{{.FieldName}}
+	for cursor.Next(ctx) {
+		var g models.{{.FieldName}}
+		cursor.Decode(&g)
+		{{.LowerFieldName}}s = append({{.LowerFieldName}}s, g)
+	}
+
+	return {{.LowerFieldName}}s, uint(total), nil
+}
+// #########################
+// No Pagination Services###
+// #########################
+
+func (s *{{$.Name}}Service) GetAll{{.FieldName}}sFor{{$.Name}}(ctx context.Context, {{$.Name | toLowerCaseName}}ID string) ([]models.{{.FieldName}}, error) {
+	{{$.Name | toLowerCaseName}}_id, err := primitive.ObjectIDFromHex({{$.Name | toLowerCaseName}}ID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid {{$.Name | toLowerCaseName}} ID: %w", err)
+	}
+
+	var {{$.Name | toLowerCaseName}} models.{{$.Name}}
+	if err := s.Collection.FindOne(ctx, bson.M{"_id": {{$.Name | toLowerCaseName}}_id}).Decode(&{{$.Name | toLowerCaseName}}); err != nil {
+		return nil, fmt.Errorf("failed to fetch {{$.Name | toLowerCaseName}}: %w", err)
+	}
+
+	{{.LowerFieldName}}Collection := s.Database.Collection("{{.FieldName}}s")
+	filter := bson.M{"_id": bson.M{"$in": {{$.Name | toLowerCaseName}}.{{.FieldName}}IDs}}
+
+	cursor, err := {{.LowerFieldName}}Collection.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch {{.LowerFieldName}}s: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var {{.LowerFieldName}}s []models.{{.FieldName}}
+	for cursor.Next(ctx) {
+		var g models.{{.FieldName}}
+		if err := cursor.Decode(&g); err != nil {
+			return nil, fmt.Errorf("failed to decode {{.LowerFieldName}}: %w", err)
+		}
+		{{.LowerFieldName}}s = append({{.LowerFieldName}}s, g)
+	}
+
+	return {{.LowerFieldName}}s, nil
+}
+
+
+func (s *{{$.Name}}Service) GetAll{{.FieldName}}s{{$.Name | toLowerCaseName}}DoesNotHave(ctx context.Context, {{$.Name | toLowerCaseName}}ID string) ([]models.{{.FieldName}}, error) {
+	{{$.Name | toLowerCaseName}}_id, err := primitive.ObjectIDFromHex({{$.Name | toLowerCaseName}}ID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid {{$.Name | toLowerCaseName }} ID: %w", err)
+	}
+
+	var {{$.Name | toLowerCaseName}} models.{{$.Name}}
+	if err := s.Collection.FindOne(ctx, bson.M{"_id": {{$.Name | toLowerCaseName}}_id }).Decode(&{{$.Name | toLowerCaseName}}); err != nil {
+		return nil, fmt.Errorf("failed to fetch {{$.Name | toLowerCaseName }}: %w", err)
+	}
+
+	{{.LowerFieldName}}Collection := s.Database.Collection("{{.FieldName}}s")
+
+	filter := bson.M{}
+	if len({{$.Name | toLowerCaseName}}.{{.FieldName}}IDs) > 0 {
+		filter["_id"] = bson.M{"$nin": {{$.Name | toLowerCaseName }}.{{.FieldName}}IDs}
+	}
+
+	cursor, err := {{.LowerFieldName}}Collection.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch {{.LowerFieldName}}s: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var {{.LowerFieldName}}s []models.{{.FieldName}}
+	for cursor.Next(ctx) {
+		var g models.{{.FieldName}}
+		if err := cursor.Decode(&g); err != nil {
+			return nil, fmt.Errorf("failed to decode {{.LowerFieldName}}: %w", err)
+		}
+		{{.LowerFieldName}}s = append({{.LowerFieldName}}s, g)
+	}
+
+	return {{.LowerFieldName}}s, nil
+}
+
+
+
+{{- end}}
+
+
+// ##########################################################
+// ##########  Custom Services Add Here   ###################
+// ##########################################################

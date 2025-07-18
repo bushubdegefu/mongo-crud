@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"{{.ProjectName}}/observe"
+	"{{.ProjectName}}/database"
 	"github.com/labstack/echo/v4"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -26,6 +27,25 @@ func otelechospanstarter(next echo.HandlerFunc) echo.HandlerFunc {
 		return nil
 	}
 }
+
+
+func dbsessioninjection(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(ctx echo.Context) error {
+		client, err := database.ReturnMongoClient("{{ $.AppName |  replaceString }}")
+		if err != nil {
+			return err
+		}
+		
+		ctx.Set("db", client)
+
+		nerr := next(ctx)
+		if nerr != nil {
+			return nerr
+		}
+		return nil
+	}
+}
+
 
 
 
