@@ -22,42 +22,40 @@ import (
 var AppTracer = otel.Tracer(fmt.Sprintf("cli-server-%v", configs.AppConfig.GetOrDefault("APP_NAME", "blue-app")))
 
 func InitTracer() *sdktrace.TracerProvider {
-	traceExporter := configs.AppConfig.Get("TRACE_EXPORTER")
-	tracerHost := configs.AppConfig.Get("TRACER_HOST")
-	tracerPort := configs.AppConfig.GetOrDefault("TRACER_PORT", "9411")
+    traceExporter := configs.AppConfig.Get("TRACE_EXPORTER")
+    tracerHost := configs.AppConfig.Get("TRACER_HOST")
+    tracerPort := configs.AppConfig.GetOrDefault("TRACER_PORT", "4317") // Default to gRPC port
 
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithResource(resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceNameKey.String(configs.AppConfig.Get("APP_NAME")),
-		)),
-	)
-	// app logger with jager
+    // Create resource with service name
+    res := resource.NewWithAttributes(
+        semconv.SchemaURL,
+        semconv.ServiceNameKey.String(configs.AppConfig.Get("APP_NAME")),
+    )
 
-	otel.SetTracerProvider(tp)
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
-	// otel.SetErrorHandler(&otelErrorHandler{logger: app_logger})
+    // Create TracerProvider
+    tp := sdktrace.NewTracerProvider(
+        sdktrace.WithResource(res),
+    )
 
-	const traceExporterEcho = "jaeger"
+    // Set global tracer provider and propagator
+    otel.SetTracerProvider(tp)
+    otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
-	if (traceExporter != "" && tracerHost != "") || traceExporter == traceExporterEcho {
-		var (
-			exporter sdktrace.SpanExporter
-			// err      error
-		)
+    if strings.ToLower(traceExporter) == "jaeger" && tracerHost != "" {
+        exporter, err := otlptracegrpc.New(context.Background(),
+            otlptracegrpc.WithInsecure(),
+            otlptracegrpc.WithEndpoint(fmt.Sprintf("%s:%s", tracerHost, tracerPort)),
+        )
+        if err != nil {
+            panic(fmt.Sprintf("Failed to create Jaeger exporter: %v", err))
+        }
 
-		switch strings.ToLower(traceExporter) {
-		case "jaeger":
-			// app_logger.Log("Exporting traces to jaeger.")
+        // Register batch span processor
+        batcher := sdktrace.NewBatchSpanProcessor(exporter)
+        tp.RegisterSpanProcessor(batcher)
+    }
 
-			exporter, _ = otlptracegrpc.New(context.Background(), otlptracegrpc.WithInsecure(),
-				otlptracegrpc.WithEndpoint(fmt.Sprintf("%s:%s", tracerHost, tracerPort)))
-
-			batcher := sdktrace.NewBatchSpanProcessor(exporter)
-			tp.RegisterSpanProcessor(batcher)
-		}
-	}
-	return tp
+    return tp
 }
 
 

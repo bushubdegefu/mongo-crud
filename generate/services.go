@@ -18,6 +18,9 @@ func GenerateServices(data mtemplates.Data) {
 		mtemplates.WriteTemplateToFileModel(filePath, tmpl, model)
 	}
 
-	// mtemplates.WriteTemplateToFile("models/init.go", migrationTmpl, data)
+}
+func GenerateServicesInit(data mtemplates.Data) {
+	inittmpl := mtemplates.LoadTemplate("initService")
+	mtemplates.WriteTemplateToFile("services/init.go", inittmpl, data)
 
 }

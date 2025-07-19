@@ -1,0 +1,12 @@
+package services
+
+import "go.mongodb.org/mongo-driver/mongo"
+
+func InitServices(client *mongo.Client) {
+	// Initialize services here
+{{- range .Models}}
+	New{{.Name}}Service(client)
+	New{{.Name}}Service(client)
+	New{{.Name}}Service(client)
+{{- end}}
+}

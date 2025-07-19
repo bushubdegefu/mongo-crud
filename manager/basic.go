@@ -175,11 +175,11 @@ func init() {
 	// Register flags for all commands
 	initalizemodule.Flags().StringP("name", "n", "", "Specify the module name  (github.com/someuser/someproject)")
 	initalizemodule.Flags().StringP("app", "a", "", "Specify the application name  like auth-app,hrm-app")
-	initalizemodule.Flags().StringP("auth", "p", "", "Specify the authentication application name  defaults to django_auth")
+	initalizemodule.Flags().StringP("auth", "p", "", "Specify the authentication application name  defaults to admin_app")
 	initalizemodule.Flags().StringP("type", "t", "", "specify if you are using standalone authentication like django admin or sso like solution")
 
 	// Register flags for the 'basic' command
-	basicCommand.Flags().StringP("type", "t", "", "Specify the type of folder structure to generate: rsa, db, producer,logs, consumer, tasks, pagination, otel,migration,config")
+	basicCommand.Flags().StringP("type", "t", "", "Specify the type of folder structure to generate: db, logs, tasks,service,tracer,config")
 	basicCommand.Flags().StringP("frame", "f", "", "Specify the Spanner function you want for the tracer, echo/fiber, meant to be used with otel flag")
 	basicCommand.Flags().StringP("name", "n", "", "Specify the project module name as in github.com/someuser/someproject for the json template generation")
 	basicCommand.Flags().StringP("app", "a", "", "Specify the app name, all it will try to generate for all jsons")

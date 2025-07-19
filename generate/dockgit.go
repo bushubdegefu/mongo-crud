@@ -17,7 +17,7 @@ func DockerFrame(data mtemplates.Data) {
 }
 
 func HaproxyFrame(data mtemplates.Data) {
-	tmpl := mtemplates.LoadTemplate("haproxy.tmpl")
+	tmpl := mtemplates.LoadTemplate("haproxy")
 	mtemplates.WriteTemplateToFile("haproxy.cfg", tmpl, data)
 }
 

@@ -1,17 +1,22 @@
 package models
 
 import (
+	"math/rand"
 	"crypto/sha512"
 	"encoding/hex"
 
 	"{{.ProjectName}}/configs"
 )
 
+const (
+	charsetLen = 62
+	charset    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+)
+
 // Helper for pagination
 type Pagination struct {
 	Page   int
 	Size   int
-	Offset int
 }
 
 
@@ -38,4 +43,16 @@ func HashFunc(password string) string {
 	// Convert the hashed to hex string
 	var hashedPasswordHex = hex.EncodeToString(hashedPassword)
 	return hashedPasswordHex
+}
+
+
+func GenerateRandomString(length int) (string, error) {
+	result := make([]byte, length)
+
+	for i := 0; i < length; i++ {
+		index := rand.Intn(charsetLen)
+		result[i] = charset[index]
+	}
+
+	return string(result), nil
 }

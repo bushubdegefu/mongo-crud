@@ -36,14 +36,11 @@ func runServiceCommand(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Generate models and migrations
-	// if framework == "init" {
-	// generate.GenerateModels(mtemplates.RenderData)
-
-	// } else {
+	generate.GenerateUtilsApp(mtemplates.ProjectSettings)
 	generate.GenerateServices(mtemplates.RenderData)
+	generate.GenerateServicesInit(mtemplates.RenderData)
 	mtemplates.CommonCMD()
-	// }
+
 }
 
 func init() {

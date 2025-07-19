@@ -14,6 +14,10 @@ import (
 	"github.com/jinzhu/copier"
 )
 
+
+
+var Handler{{.Name}}Service {{.Name}}Service
+
 // UserService wraps MongoDB logic for users
 type {{.Name}}Service struct {
 	Collection *mongo.Collection
@@ -26,11 +30,12 @@ type {{.Name}}Service struct {
 func New{{.Name}}Service(client *mongo.Client) (*{{.Name}}Service, error) {
 	database := client.Database("{{ $.AppName |  replaceString }}")
 	collection := database.Collection("{{.Name}}s")
-	return &{{.Name}}Service{
+	Handler{{.Name}}Service =  {{.Name}}Service{
 		Collection: collection,
 		Client:     client,
 		Database:   database,
-	}, nil
+	}
+	return &Handler{{.Name}}Service, nil
 }
 
 // Utility function for transactions
@@ -57,7 +62,7 @@ func (s *{{.Name}}Service) withTransaction(ctx context.Context, fn func(sc mongo
 // Create inserts a new {{.LowerName}}
 func (s *{{.Name}}Service) Create(ctx context.Context, posted_{{.LowerName}} *models.{{.Name}}Post) (*models.{{.Name}}Get, error) {
 	var created{{.Name}} models.{{.Name}}Get
-	
+
 	err := s.withTransaction(ctx, func(sc mongo.SessionContext) error {
 			{{- range .Fields}} {{- if .Post}}
 				{{- if eq .Name "Password" }}
@@ -88,7 +93,7 @@ func (s *{{.Name}}Service) Create(ctx context.Context, posted_{{.LowerName}} *mo
 			}
 
 			copier.Copy(created{{.Name}},{{.LowerName}})
-			
+
 			return nil
 		})
 
@@ -97,7 +102,7 @@ func (s *{{.Name}}Service) Create(ctx context.Context, posted_{{.LowerName}} *mo
 
 // GetOne fetches a {{.LowerName}} by ID
 func (s *{{.Name}}Service) GetOne(ctx context.Context, id string) (*models.{{.Name}}Get, error) {
-	
+
 	objID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid ID: %w", err)
@@ -174,7 +179,7 @@ func (s *{{.Name}}Service) Update(ctx context.Context, patch_{{.LowerName}} *mod
 				updateFields["{{.Name | camelToSnake }}"] = hashedPassword
 			}
 			{{- else if eq .Name "ID" }}
-				
+
 			{{- else }}
 			if patch_{{$.LowerName}}.{{.Name}} != nil {
 				updateFields["{{.Name | camelToSnake }}"] = *patch_{{$.LowerName}}.{{.Name}}
@@ -183,9 +188,9 @@ func (s *{{.Name}}Service) Update(ctx context.Context, patch_{{.LowerName}} *mod
 			{{- end}}
 			{{- end}}
 			updateFields["updated_at"]=time.Now()
-				
-			
-			// filter to use to update value by 
+
+
+			// filter to use to update value by
 			filter{{.Name}} := bson.M{"_id": {{.LowerName}}_id}
 			update{{.Name}} := bson.M{"$set": updateFields}
 			// Update the document by ID
@@ -193,10 +198,10 @@ func (s *{{.Name}}Service) Update(ctx context.Context, patch_{{.LowerName}} *mod
 			if err != nil {
 				return fmt.Errorf("insert failed: %w", err)
 			}
-	
+
 			return nil
 		})
-	
+
 	copier.Copy(&updated{{.Name}}, patch_{{.LowerName}})
 	return updated{{.Name}}, err
 }

@@ -12,6 +12,7 @@ import (
 	{{ . | replaceString }} "{{$.ProjectName}}/{{ . }}"
 	{{- end }}
 	"{{.ProjectName}}/configs"
+	"{{.ProjectName}}/database"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
@@ -22,7 +23,10 @@ import (
 
 	{{- range .AppNames}}
 	{{ . | replaceString }}_tasks "{{$.ProjectName}}/{{ . }}/bluetasks"
+	{{ . | replaceString }}_service "{{$.ProjectName}}/{{ . }}/services"
 	{{- end }}
+
+
 
 	"{{.ProjectName}}/observe"
 )
@@ -161,6 +165,18 @@ func waitForShutdown(app *echo.Echo, scheduledTasks []*tasks.Scheduler, ctx cont
 }
 
 func startServer(app *echo.Echo) {
+	{{- range .AppNames}}
+        // create client
+    {{ . | replaceString }}_client, err := database.ReturnMongoClient("{{ . |  replaceString }}")
+		if err != nil {
+				panic("unable to initalize services")
+		}
+
+	// initialize services
+    {{ . | replaceString }}_service.InitServices({{ . | replaceString }}_client)
+	{{- end}}
+
+
 	HTTP_PORT := configs.AppConfig.Get("HTTP_PORT")
 	if app_tls == "on" {
 		CERT_FILE := "./server.pem"

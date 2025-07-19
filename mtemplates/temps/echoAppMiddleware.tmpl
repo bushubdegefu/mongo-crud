@@ -29,24 +29,4 @@ func otelechospanstarter(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 
-func dbsessioninjection(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(ctx echo.Context) error {
-		client, err := database.ReturnMongoClient("{{ $.AppName |  replaceString }}")
-		if err != nil {
-			return err
-		}
-		
-		ctx.Set("db", client)
-
-		nerr := next(ctx)
-		if nerr != nil {
-			return nerr
-		}
-		return nil
-	}
-}
-
-
-
-
 // Custom Middlewares can be added here specfic to the app

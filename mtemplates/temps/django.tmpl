@@ -86,7 +86,7 @@
       },
       {
         "name": "Group",
-         "search_fields": ["name","_id"],
+         "search_fields": ["name"],
         "rln_model": [
           "Permission$mtm$user_permissions"
             ],
@@ -109,12 +109,12 @@
             "annotation": "bson:\"permission_ids,omitzero\" json:\"permission_ids,omitzero\"",
             "curd_flag": "true$false$false$false$false$true"
           }
-        
+
         ]
       },
        {
         "name": "Permission",
-         "search_fields": ["name","_id","codename"],
+         "search_fields": ["name","codename"],
         "rln_model": [],
         "fields": [
           {

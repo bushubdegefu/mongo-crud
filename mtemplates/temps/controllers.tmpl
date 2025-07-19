@@ -9,13 +9,12 @@ import (
 	{{- end}}
 	{{- end}}
 	{{- if $break_math }}
-	
+
 	{{ end }}
 	"net/http"
 	"strconv"
 
 	"github.com/go-playground/validator/v10"
-    "go.mongodb.org/mongo-driver/mongo"
 	"github.com/labstack/echo/v4"
 	"{{.ProjectName}}/common"
 	"{{.ProjectName}}/{{.AppName}}/models"
@@ -43,11 +42,7 @@ func Get{{.Name}}s(contx echo.Context) error {
 	//  Geting tracer
 	tracer := contx.Get("tracer").(*observe.RouteTracer)
 
-     //  Geting dbsession
-     db := contx.Get("db").(*mongo.Client)
-
-
-	//  parsing Query Prameters
+    //  parsing Query Prameters
 	Page, _ := strconv.Atoi(contx.QueryParam("page"))
 	Limit, _ := strconv.Atoi(contx.QueryParam("size"))
 	//  checking if query parameters  are correct
@@ -71,15 +66,6 @@ func Get{{.Name}}s(contx echo.Context) error {
 
 	searchFields := []string{"username", "email", "first_name", "last_name"}
 	filteredSearchTerm := common.FilterSearchTerms(searchTerm, searchFields)
-   
-	// Initialize {{.Name}}Service
-	{{.LowerName}}Service, err := services.New{{.Name}}Service(db)
-	if err != nil {
-		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
-			Success: false,
-			Message: "Failed to initialize user service",
-		})
-	}
 
 	// Prepare pagination model
 	pagination := models.Pagination{
@@ -88,7 +74,7 @@ func Get{{.Name}}s(contx echo.Context) error {
 	}
 
 	// Fetch {{.LowerName}}s from service
-	{{.LowerName}}s,totalCount, err := {{.LowerName}}Service.Get(tracer.Tracer, pagination, searchFields, filteredSearchTerm)
+	{{.LowerName}}s,totalCount, err := services.Handler{{.Name}}Service.Get(tracer.Tracer, pagination, searchFields, filteredSearchTerm)
 	if err != nil {
 		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
 			Success: false,
@@ -124,25 +110,11 @@ func Get{{.Name}}ByID(contx echo.Context) error {
 	//  Geting tracer
 	tracer := contx.Get("tracer").(*observe.RouteTracer)
 
-    //  Geting dbsession
-    db := contx.Get("db").(*mongo.Client)
-
-
-
-	//  parsing Query Prameters
+   	//  parsing Query Prameters
 	id := contx.Param("{{.LowerName}}_id")
 
-    // Initialize {{.Name}}Service
-	{{.LowerName}}Service, err := services.New{{.Name}}Service(db)
-	if err != nil {
-		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
-			Success: false,
-			Message: "Failed to initialize user service",
-		})
-	}
-
     // Fetch {{.LowerName}} from service
-	{{.LowerName}}, err := {{.LowerName}}Service.GetOne(tracer.Tracer, id)
+	{{.LowerName}}, err := services.Handler{{.Name}}Service.GetOne(tracer.Tracer, id)
 	if err != nil {
 		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
 			Success: false,
@@ -156,8 +128,8 @@ func Get{{.Name}}ByID(contx echo.Context) error {
 		Message: "Success",
 		Data:   {{.LowerName}},
 	})
-	
-	
+
+
 }
 
 // Add {{.Name}} to data
@@ -176,8 +148,6 @@ func Post{{.Name}}(contx echo.Context) error {
 	//  Geting tracer
 	tracer := contx.Get("tracer").(*observe.RouteTracer)
 
-    //  Geting dbsession
-    db := contx.Get("db").(*mongo.Client)
 
 	// validator initialization
 	validate := validator.New()
@@ -203,25 +173,17 @@ func Post{{.Name}}(contx echo.Context) error {
 		})
 	}
 
-      // Initialize {{.Name}}Service
-	{{.LowerName}}Service, err := services.New{{.Name}}Service(db)
-	if err != nil {
-		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
-			Success: false,
-			Message: "Failed to initialize user service",
-		})
-	}
 
     // post {{.LowerName}} from service
-	{{.LowerName}}, err := {{.LowerName}}Service.Create(tracer.Tracer, posted_{{.LowerName}})
+	{{.LowerName}}, err := services.Handler{{.Name}}Service.Create(tracer.Tracer, posted_{{.LowerName}})
 	if err != nil {
 		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
 			Success: false,
 			Message: err.Error(),
 		})
 	}
-	
-	
+
+
 	// return data if transaction is sucessfull
 	return contx.JSON(http.StatusOK, common.ResponseHTTP{
 		Success: true,
@@ -246,9 +208,6 @@ func Post{{.Name}}(contx echo.Context) error {
 func Patch{{.Name}}(contx echo.Context) error {
 	//  Geting tracer
 	tracer := contx.Get("tracer").(*observe.RouteTracer)
-
-    //  Geting dbsession
-    db := contx.Get("db").(*mongo.Client)
 
 	// validator initialization
 	validate := validator.New()
@@ -276,26 +235,19 @@ func Patch{{.Name}}(contx echo.Context) error {
 			Data:    nil,
 		})
 	}
-	
 
-	{{.LowerName}}Service, err := services.New{{.Name}}Service(db)
-	if err != nil {
-		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
-			Success: false,
-			Message: "Failed to initialize user service",
-		})
-	}
+
 
     // patch {{.LowerName}} from service
-	{{.LowerName}}, err := {{.LowerName}}Service.Update(tracer.Tracer, patch_{{.LowerName}},id)
+	{{.LowerName}}, err := services.Handler{{.Name}}Service.Update(tracer.Tracer, patch_{{.LowerName}},id)
 	if err != nil {
 		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
 			Success: false,
 			Message: err.Error(),
 		})
 	}
-	
-	
+
+
 	// return data if transaction is sucessfull
 	return contx.JSON(http.StatusOK, common.ResponseHTTP{
 		Success: true,
@@ -321,31 +273,21 @@ func Delete{{.Name}}(contx echo.Context) error {
 	//  Geting tracer
 	tracer := contx.Get("tracer").(*observe.RouteTracer)
 
-    //  Geting dbsession
-    db := contx.Get("db").(*mongo.Client)
-
 
 	// validate path params
 	id:= contx.Param("{{.LowerName}}_id")
-	
-    {{$.LowerName}}Service, err := services.New{{.Name}}Service(db)
-	if err != nil {
-		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
-			Success: false,
-			Message: "Failed to initialize user service",
-		})
-	}
+
 
     // delete {{.LowerName}} from service
-	err = {{.LowerName}}Service.Delete(tracer.Tracer, id)
+	err := services.Handler{{.Name}}Service.Delete(tracer.Tracer, id)
 	if err != nil {
 		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
 			Success: false,
 			Message: err.Error(),
 		})
 	}
-	
-	
+
+
 	// Return success respons
 	return contx.JSON(http.StatusOK, common.ResponseHTTP{
 		Success: true,
@@ -367,34 +309,22 @@ func Delete{{.Name}}(contx echo.Context) error {
 // @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param {{.LowerFieldName}}_id path int true "{{.FieldName}} ID"
-// @Param {{.LowerParentName}}_id path int true "{{.ParentName}} ID"
+// @Param {{.LowerFieldName}}_id path string true "{{.FieldName}} ID"
+// @Param {{.LowerParentName}}_id path string true "{{.ParentName}} ID"
 // @Failure 400 {object} common.ResponseHTTP{}
 // @Router /{{$.AppName | replaceString}}/{{.LowerParentName}}{{.LowerFieldName}}/{{ "{" }}{{.LowerFieldName}}_id{{ "}" }}/{{ "{" }}{{.LowerParentName}}_id{{ "}" }} [post]
 func Add{{.FieldName}}To{{.ParentName}}(contx echo.Context) error {
 	//  Geting tracer
 	tracer := contx.Get("tracer").(*observe.RouteTracer)
 
-	//  Geting dbsession
-    db := contx.Get("db").(*mongo.Client)
-
-
 	// validate path params
 	{{.LowerFieldName}}_id := contx.Param("{{.LowerFieldName}}_id")
-	
+
 	// validate path params
 	{{.LowerParentName}}_id := contx.Param("{{.LowerParentName}}_id")
 
-    // initalizing  retlation service
-    {{$.LowerName}}Service, err := services.New{{$.Name}}Service(db)
-	if err != nil {
-		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
-			Success: false,
-			Message: "Failed to initialize user service",
-		})
-	}
 
-	err = {{$.LowerName}}Service.Add{{$.Name}}To{{.FieldName}}(tracer.Tracer, {{.LowerParentName}}_id,{{.LowerFieldName}}_id)
+	err := services.Handler{{$.Name}}Service.Add{{$.Name}}To{{.FieldName}}(tracer.Tracer, {{.LowerParentName}}_id,{{.LowerFieldName}}_id)
 	if err != nil {
 		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
 			Success: false,
@@ -418,8 +348,8 @@ func Add{{.FieldName}}To{{.ParentName}}(contx echo.Context) error {
 // @Security ApiKeyAuth
 // @Accept json
 // @Produce json
-// @Param {{.LowerFieldName}}_id path int true "{{.FieldName}} ID"
-// @Param {{.LowerParentName}}_id path int true "{{.ParentName}} ID"
+// @Param {{.LowerFieldName}}_id path string true "{{.FieldName}} ID"
+// @Param {{.LowerParentName}}_id path string true "{{.ParentName}} ID"
 // @Success 200 {object} common.ResponseHTTP{data=models.{{.ParentName}}Post}
 // @Failure 400 {object} common.ResponseHTTP{}
 // @Failure 500 {object} common.ResponseHTTP{}
@@ -428,27 +358,15 @@ func Delete{{.FieldName}}From{{.ParentName}}(contx echo.Context) error {
 	//  Geting tracer
 		tracer := contx.Get("tracer").(*observe.RouteTracer)
 
-	//  Geting dbsession
-    db := contx.Get("db").(*mongo.Client)
-
 	// validate path params
 	{{.LowerFieldName}}_id := contx.Param("{{.LowerFieldName}}_id")
-	
+
 	// validate path params
 	{{.LowerParentName}}_id := contx.Param("{{.LowerParentName}}_id")
-	
-    // initalizing  retlation service
-    {{$.LowerName}}Service, err := services.New{{$.Name}}Service(db)
-	if err != nil {
-		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
-			Success: false,
-			Message: "Failed to initialize user service",
-		})
-	}
 
-	
+
 	// removing {{.FieldName}}From{{.ParentName}}
-	err = {{$.LowerName}}Service.Remove{{ $.Name}}From{{.FieldName}}(tracer.Tracer, {{.LowerParentName}}_id,{{.LowerFieldName}}_id)
+	err := services.Handler{{$.Name}}Service.Remove{{ $.Name}}From{{.FieldName}}(tracer.Tracer, {{.LowerParentName}}_id,{{.LowerFieldName}}_id)
 	if err != nil {
 		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
 			Success: false,
@@ -482,9 +400,6 @@ func Get{{.FieldName}}sOf{{.ParentName}}s(contx echo.Context) error {
 	//  Geting tracer
 	tracer := contx.Get("tracer").(*observe.RouteTracer)
 
-	//  Geting dbsession
-    db := contx.Get("db").(*mongo.Client)
-
 	//  parsing Query Prameters
 	Page, _ := strconv.Atoi(contx.QueryParam("page"))
 	Limit, _ := strconv.Atoi(contx.QueryParam("size"))
@@ -499,7 +414,7 @@ func Get{{.FieldName}}sOf{{.ParentName}}s(contx echo.Context) error {
 
 	// validate path params
 	{{.LowerParentName}}_id := contx.Param("{{.LowerParentName}}_id")
-	
+
     // Prepare pagination model
 	pagination := models.Pagination{
 		Page:   Page - 1, // assuming pages are 0-indexed in backend
@@ -507,17 +422,8 @@ func Get{{.FieldName}}sOf{{.ParentName}}s(contx echo.Context) error {
 	}
 
 
-    // Initialize {{$.Name}}Service
-	{{$.LowerName}}Service, err := services.New{{$.Name}}Service(db)
-	if err != nil {
-		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
-			Success: false,
-			Message: "Failed to initialize user service",
-		})
-	}
-
     // Fetch {{$.LowerName}}s from service
-	{{.LowerFieldName}}s,totalCount, err := {{$.LowerName}}Service.Get{{$.Name}}{{.FieldName}}s(tracer.Tracer,{{.LowerParentName}}_id ,pagination)
+	{{.LowerFieldName}}s,totalCount, err := services.Handler{{$.Name}}Service.Get{{$.Name}}{{.FieldName}}s(tracer.Tracer,{{.LowerParentName}}_id ,pagination)
 	if err != nil {
 		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
 			Success: false,
@@ -557,24 +463,12 @@ func GetAll{{.FieldName}}sOf{{.ParentName}}s(contx echo.Context) error {
 	//  Geting tracer
 	tracer := contx.Get("tracer").(*observe.RouteTracer)
 
-	//  Geting dbsession
-    db := contx.Get("db").(*mongo.Client)
-
 	// validate path params
 	{{.LowerParentName}}_id := contx.Param("{{.LowerParentName}}_id")
-	
 
-    // Initialize {{$.Name}}Service
-	{{$.LowerName}}Service, err := services.New{{$.Name}}Service(db)
-	if err != nil {
-		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
-			Success: false,
-			Message: "Failed to initialize user service",
-		})
-	}
 
     // Fetch {{$.LowerName}}s from service
-	{{.LowerFieldName}}s, err := {{$.LowerName}}Service.GetAll{{.FieldName}}sFor{{$.Name}}(tracer.Tracer,{{.LowerParentName}}_id)
+	{{.LowerFieldName}}s, err := services.Handler{{$.Name}}Service.GetAll{{.FieldName}}sFor{{$.Name}}(tracer.Tracer,{{.LowerParentName}}_id)
 	if err != nil {
 		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
 			Success: false,
@@ -582,8 +476,6 @@ func GetAll{{.FieldName}}sOf{{.ParentName}}s(contx echo.Context) error {
 		})
 	}
 
-
-	
 	// return value if transaction is sucessfull
 	return contx.JSON(http.StatusOK, common.ResponseHTTP{
 		Success: true,
@@ -607,24 +499,12 @@ func Get{{.FieldName}}Complement{{.ParentName}}s(contx echo.Context) error {
 	//  Geting tracer
 	tracer := contx.Get("tracer").(*observe.RouteTracer)
 
-	//  Geting dbsession
-    db := contx.Get("db").(*mongo.Client)
-
 	// validate path params
 	{{.LowerParentName}}_id := contx.Param("{{.LowerParentName}}_id")
-	
 
-    // Initialize {{$.Name}}Service
-	{{$.LowerName}}Service, err := services.New{{$.Name}}Service(db)
-	if err != nil {
-		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
-			Success: false,
-			Message: "Failed to initialize user service",
-		})
-	}
 
     // Fetch {{$.LowerName}}s from service
-	{{.LowerFieldName}}s, err := {{$.LowerName}}Service.GetAll{{.FieldName}}s{{$.LowerName }}DoesNotHave(tracer.Tracer,{{.LowerParentName}}_id)
+	{{.LowerFieldName}}s, err := services.Handler{{$.Name}}Service.GetAll{{.FieldName}}s{{$.LowerName }}DoesNotHave(tracer.Tracer,{{.LowerParentName}}_id)
 	if err != nil {
 		return contx.JSON(http.StatusInternalServerError, common.ResponseHTTP{
 			Success: false,
